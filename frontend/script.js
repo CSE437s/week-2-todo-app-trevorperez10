@@ -2,41 +2,29 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTasks();
 });
 
-function loadTasks() {
-    fetch('/api/tasks')
-        .then(response => response.json())
-        .then(tasks => {
-            renderTasks(tasks);
-        })
-        .catch(error => {
-            console.error('Error fetching tasks:', error);
-        });
-}
-
 function addTask() {
     const taskTitle = document.getElementById('newTaskTitle').value;
     const taskDueDate = document.getElementById('newTaskDueDate').value;
     const taskPriority = document.getElementById('newTaskPriority').value;
 
-    const taskData = {
+    if (taskTitle === '') {
+        alert('Please enter a task title.');
+        return;
+    }
+
+    const task = {
+        id: Date.now(),
         title: taskTitle,
         dueDate: taskDueDate,
-        priority: taskPriority
+        priority: taskPriority,
+        completed: false
     };
 
-    fetch('/api/tasks', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(taskData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        loadTasks(); 
-        clearInputFields();
-    })
-    .catch(error => console.error('Error adding task:', error));
+    let tasks = getTasks();
+    tasks.push(task);
+    saveTasks(tasks);
+    renderTasks();
+    clearInputFields();
 }
 
 function clearInputFields() {
@@ -45,14 +33,24 @@ function clearInputFields() {
     document.getElementById('newTaskPriority').value = '';
 }
 
-function renderTasks(tasks) {
+function getTasks() {
+    let tasks = localStorage.getItem('tasks');
+    return tasks ? JSON.parse(tasks) : [];
+}
+
+function saveTasks(tasks) {
+    localStorage.setItem('tasks', JSON.stringify(tasks));
+}
+
+function renderTasks() {
+    const tasks = getTasks();
     const taskList = document.getElementById('taskList');
     taskList.innerHTML = '';
 
     tasks.forEach(task => {
         const li = document.createElement('li');
         li.innerHTML = `
-            <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleComplete(${task.id}, this)">
+            <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleComplete(${task.id})">
             ${task.title} - Due: ${task.dueDate || 'No due date'} - Priority: ${task.priority || 'No priority'}
             <button onclick="deleteTask(${task.id})">Delete</button>
         `;
@@ -63,30 +61,21 @@ function renderTasks(tasks) {
     });
 }
 
-function toggleComplete(id, checkboxElem) {
-    const completed = checkboxElem.checked;
-
-    fetch(`/api/tasks/${id}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ completed })
-    })
-    .then(response => response.json())
-    .then(() => {
-        loadTasks(); 
-    })
-    .catch(error => console.error('Error updating task:', error));
+function toggleComplete(id) {
+    let tasks = getTasks();
+    const taskIndex = tasks.findIndex(task => task.id === id);
+    tasks[taskIndex].completed = !tasks[taskIndex].completed;
+    saveTasks(tasks);
+    renderTasks();
 }
 
 function deleteTask(id) {
-    fetch(`/api/tasks/${id}`, {
-        method: 'DELETE'
-    })
-    .then(response => response.json())
-    .then(() => {
-        loadTasks(); 
-    })
-    .catch(error => console.error('Error deleting task:', error));
+    let tasks = getTasks();
+    tasks = tasks.filter(task => task.id !== id);
+    saveTasks(tasks);
+    renderTasks();
+}
+
+function loadTasks() {
+    renderTasks();
 }
